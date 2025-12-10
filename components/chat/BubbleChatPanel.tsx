@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { Channel as StreamChannel, MessageResponse } from 'stream-chat'
+import { Channel as StreamChannel, MessageResponse, FormatMessageResponse } from 'stream-chat'
 import { useChat } from '@/contexts/ChatContext'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
@@ -74,14 +74,15 @@ export function BubbleChatPanel({ bubbleId, isOpen, onClose }: BubbleChatPanelPr
   }, [isOpen, isConnected, bubbleId, joinBubbleChannel, scrollToBottom])
 
   // Transform Stream Chat message to our format
-  const transformMessage = (msg: MessageResponse): Message => ({
+  // Accepts both MessageResponse (from events) and FormatMessageResponse (from state)
+  const transformMessage = (msg: MessageResponse | FormatMessageResponse): Message => ({
     id: msg.id,
     userId: msg.user?.id || '',
     username: (msg.user?.username as string) || msg.user?.id || 'Unknown',
     displayName: (msg.user?.name as string) || null,
     avatarUrl: (msg.user?.image as string) || null,
     text: msg.text || '',
-    createdAt: new Date(msg.created_at || Date.now()),
+    createdAt: msg.created_at instanceof Date ? msg.created_at : new Date(msg.created_at || Date.now()),
   })
 
   // Send a message

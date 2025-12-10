@@ -107,12 +107,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
         // Listen for unread count changes
         chatClient.on('notification.message_new', () => {
-          const totalUnread = chatClient.user?.total_unread_count || 0
+          // Cast to access total_unread_count which exists on OwnUserResponse
+          const user = chatClient.user as { total_unread_count?: number } | undefined
+          const totalUnread = user?.total_unread_count || 0
           setUnreadCount(totalUnread)
         })
 
         chatClient.on('notification.mark_read', () => {
-          const totalUnread = chatClient.user?.total_unread_count || 0
+          const user = chatClient.user as { total_unread_count?: number } | undefined
+          const totalUnread = user?.total_unread_count || 0
           setUnreadCount(totalUnread)
         })
       } catch (err) {
@@ -136,7 +139,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     try {
       const channel = client.channel('messaging', `bubble-${bubbleId}`, {
-        name: `Bubble Chat`,
         members: [currentUser.id],
       })
 
@@ -154,7 +156,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     try {
       const channel = client.channel('messaging', 'global', {
-        name: 'Global Chat',
         members: [currentUser.id],
       })
 
