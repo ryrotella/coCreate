@@ -279,7 +279,7 @@ export default function DraggableNode({ node }: DraggableNodeProps) {
                     className="text-white text-sm px-3 py-1.5 rounded-full font-medium animate-pulse"
                     style={{ backgroundColor: nearbyBucket.color }}
                   >
-                    Drop into "{nearbyBucket.name}"
+                    Drop into &ldquo;{nearbyBucket.name}&rdquo;
                   </div>
                 </Html>
               )}

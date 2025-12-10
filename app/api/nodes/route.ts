@@ -85,6 +85,8 @@ export async function GET(request: Request) {
     }
 
     // Transform the data to match expected format (node with placement)
+    // Supabase returns dynamic joined data, so we use any here
+    /* eslint-disable @typescript-eslint/no-explicit-any */
     const nodes = (placements || [])
       .filter((p: any) => p.node) // Filter out any orphaned placements
       .map((p: any) => ({
@@ -102,6 +104,7 @@ export async function GET(request: Request) {
           updated_at: p.updated_at,
         },
       }))
+    /* eslint-enable @typescript-eslint/no-explicit-any */
 
     return NextResponse.json({ nodes })
   } catch (error) {
