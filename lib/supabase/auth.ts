@@ -17,6 +17,8 @@ export async function signUp({ email, password, username, displayName }: SignUpD
   const supabase = createClient()
 
   // Sign up with Supabase Auth
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://co-create-eight.vercel.app'
+
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
@@ -25,6 +27,7 @@ export async function signUp({ email, password, username, displayName }: SignUpD
         username,
         display_name: displayName,
       },
+      emailRedirectTo: `${siteUrl}/auth/callback`,
     },
   })
 

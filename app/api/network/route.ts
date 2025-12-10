@@ -7,7 +7,7 @@ export async function GET() {
   try {
     const supabase = createAdminClient()
 
-    // Fetch all users with their node counts
+    // Fetch all users
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: users, error: usersError } = await (supabase as any)
       .from('users')
@@ -15,13 +15,25 @@ export async function GET() {
         id,
         username,
         display_name,
-        avatar_url,
-        nodes:nodes(count)
+        avatar_url
       `)
 
     if (usersError) {
       return NextResponse.json({ error: usersError.message }, { status: 500 })
     }
+
+    // Fetch node counts separately to avoid join issues
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: nodeCounts } = await (supabase as any)
+      .from('nodes')
+      .select('creator_id')
+
+    // Count nodes per user
+    const nodeCountMap: Record<string, number> = {}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(nodeCounts || []).forEach((node: any) => {
+      nodeCountMap[node.creator_id] = (nodeCountMap[node.creator_id] || 0) + 1
+    })
 
     // Transform users to network nodes
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,7 +42,7 @@ export async function GET() {
       username: user.username,
       displayName: user.display_name,
       avatarUrl: user.avatar_url,
-      nodeCount: user.nodes?.[0]?.count || 0,
+      nodeCount: nodeCountMap[user.id] || 0,
     }))
 
     // Fetch all connections to display as links

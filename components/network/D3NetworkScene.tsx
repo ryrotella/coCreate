@@ -17,6 +17,11 @@ interface D3NetworkSceneProps {
   streamingUserIds?: string[]
 }
 
+interface PanOffset {
+  x: number
+  y: number
+}
+
 // Default layer configuration
 const DEFAULT_LAYER_CONFIG: LayerConfig = {
   maxNodesPerLayer: 20,
@@ -43,6 +48,12 @@ export default function D3NetworkScene({
   const [isTooltipHovered, setIsTooltipHovered] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Pan state for moving around the network
+  const [panOffset, setPanOffset] = useState<PanOffset>({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
+  const dragStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null)
+  const keysPressed = useRef<Set<string>>(new Set())
 
   // Mark as mounted on client
   useEffect(() => {
@@ -137,6 +148,122 @@ export default function D3NetworkScene({
     })
   }, [graphData.links, layers, currentLayer])
 
+  // Keyboard panning (WASD and Arrow keys)
+  useEffect(() => {
+    if (!isMounted) return
+
+    const PAN_SPEED = 15
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+
+      const key = e.key.toLowerCase()
+      keysPressed.current.add(key)
+    }
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase()
+      keysPressed.current.delete(key)
+    }
+
+    // Animation loop for smooth panning
+    let animationId: number
+    const updatePan = () => {
+      const keys = keysPressed.current
+      let dx = 0
+      let dy = 0
+
+      // WASD or Arrow keys for panning
+      if (keys.has('a') || keys.has('arrowleft')) dx += PAN_SPEED
+      if (keys.has('d') || keys.has('arrowright')) dx -= PAN_SPEED
+      if (keys.has('w') || keys.has('arrowup')) dy += PAN_SPEED
+      if (keys.has('s') || keys.has('arrowdown')) dy -= PAN_SPEED
+
+      if (dx !== 0 || dy !== 0) {
+        setPanOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }))
+      }
+
+      animationId = requestAnimationFrame(updatePan)
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    animationId = requestAnimationFrame(updatePan)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+      cancelAnimationFrame(animationId)
+    }
+  }, [isMounted])
+
+  // Mouse drag panning
+  useEffect(() => {
+    if (!isMounted) return
+
+    const container = containerRef.current
+    if (!container) return
+
+    const handleMouseDown = (e: MouseEvent) => {
+      // Only pan with left mouse button
+      if (e.button !== 0) return
+      // Don't pan if clicking on interactive elements
+      if ((e.target as HTMLElement).closest('button, a, [role="button"]')) return
+
+      setIsDragging(true)
+      dragStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        panX: panOffset.x,
+        panY: panOffset.y
+      }
+      container.style.cursor = 'grabbing'
+    }
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging || !dragStartRef.current) return
+
+      const dx = e.clientX - dragStartRef.current.x
+      const dy = e.clientY - dragStartRef.current.y
+
+      setPanOffset({
+        x: dragStartRef.current.panX + dx,
+        y: dragStartRef.current.panY + dy
+      })
+    }
+
+    const handleMouseUp = () => {
+      setIsDragging(false)
+      dragStartRef.current = null
+      container.style.cursor = 'grab'
+    }
+
+    container.style.cursor = 'grab'
+    container.addEventListener('mousedown', handleMouseDown)
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      container.removeEventListener('mousedown', handleMouseDown)
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isMounted, isDragging, panOffset.x, panOffset.y])
+
+  // Reset pan with R key
+  useEffect(() => {
+    const handleReset = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 'r' && !e.ctrlKey && !e.metaKey) {
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+        setPanOffset({ x: 0, y: 0 })
+      }
+    }
+
+    window.addEventListener('keydown', handleReset)
+    return () => window.removeEventListener('keydown', handleReset)
+  }, [])
+
   // Handle node hover with tooltip positioning
   const handleNodeHover = useCallback((userId: string | null) => {
     // Clear any pending hide timeout
@@ -193,7 +320,7 @@ export default function D3NetworkScene({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full"
+      className="relative w-full h-full overflow-hidden"
       style={{ minHeight: '100vh' }}
     >
       {/* Loading state while measuring or empty state */}
@@ -224,57 +351,70 @@ export default function D3NetworkScene({
         }}
       />
 
-      {/* Grid pattern overlay */}
+      {/* Pannable content container */}
       <div
-        className="absolute inset-0 opacity-30"
+        className="absolute inset-0"
         style={{
-          backgroundImage: `
-            linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px)
-          `,
-          backgroundSize: '40px 40px'
+          transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+          transition: isDragging ? 'none' : 'transform 0.1s ease-out'
         }}
-      />
-
-      {/* Connection layer (below tiles) */}
-      {showContent && (
-        <ConnectionLayer
-          links={visibleLinks}
-          nodePositions={nodePositions}
-          hoveredNodeId={hoveredNodeId}
-          width={dimensions.width}
-          height={dimensions.height}
+      >
+        {/* Grid pattern overlay */}
+        <div
+          className="absolute opacity-30"
+          style={{
+            top: -1000,
+            left: -1000,
+            right: -1000,
+            bottom: -1000,
+            backgroundImage: `
+              linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px)
+            `,
+            backgroundSize: '40px 40px'
+          }}
         />
-      )}
 
-      {/* Z-Axis controlled layers */}
-      {showContent && (
-        <ZAxisController
-          currentLayer={currentLayer}
-          totalLayers={layers.length}
-          onLayerChange={setCurrentLayer}
-          onDeepZoom={handleDeepZoom}
-          layerSpacing={DEFAULT_LAYER_CONFIG.layerSpacing}
-        >
-          {layers.map((layer) => (
-            <IsometricGrid
-              key={layer.layerIndex}
-              nodes={layer.nodes}
-              links={graphData.links}
-              layerIndex={layer.layerIndex}
-              isActive={layer.isActive}
-              onNodeClick={onNodeClick}
-              onNodeHover={handleNodeHover}
-              selectedUserId={selectedUserId}
-              width={dimensions.width}
-              height={dimensions.height}
-              onFollowChange={onRefresh}
-              onlineUserIds={onlineUserIds}
-              streamingUserIds={streamingUserIds}
-            />
-          ))}
-        </ZAxisController>
-      )}
+        {/* Connection layer (below tiles) */}
+        {showContent && (
+          <ConnectionLayer
+            links={visibleLinks}
+            nodePositions={nodePositions}
+            hoveredNodeId={hoveredNodeId}
+            width={dimensions.width}
+            height={dimensions.height}
+          />
+        )}
+
+        {/* Z-Axis controlled layers */}
+        {showContent && (
+          <ZAxisController
+            currentLayer={currentLayer}
+            totalLayers={layers.length}
+            onLayerChange={setCurrentLayer}
+            onDeepZoom={handleDeepZoom}
+            layerSpacing={DEFAULT_LAYER_CONFIG.layerSpacing}
+          >
+            {layers.map((layer) => (
+              <IsometricGrid
+                key={layer.layerIndex}
+                nodes={layer.nodes}
+                links={graphData.links}
+                layerIndex={layer.layerIndex}
+                isActive={layer.isActive}
+                onNodeClick={onNodeClick}
+                onNodeHover={handleNodeHover}
+                selectedUserId={selectedUserId}
+                width={dimensions.width}
+                height={dimensions.height}
+                onFollowChange={onRefresh}
+                onlineUserIds={onlineUserIds}
+                streamingUserIds={streamingUserIds}
+              />
+            ))}
+          </ZAxisController>
+        )}
+      </div>
 
       {/* Tooltip */}
       <NetworkTooltip

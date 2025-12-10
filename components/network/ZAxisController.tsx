@@ -95,7 +95,7 @@ export default function ZAxisController({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full overflow-hidden perspective-container"
+      className="relative w-full h-full overflow-visible perspective-container"
     >
       {/* 3D scene container */}
       <div

@@ -256,7 +256,7 @@ export default function NetworkPage() {
       {viewMode === '2.5d' && (
         <div className="absolute bottom-4 left-4 pointer-events-none">
           <div className="bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white/60 text-sm">
-            <p>🎮 <span className="text-purple-300">2.5D:</span> Scroll to explore layers • Click tile to enter space • Hover for details</p>
+            <p>🎮 <span className="text-purple-300">2.5D:</span> WASD/Arrows to pan • Drag to move • Scroll for layers • R to reset • Click tile to enter</p>
           </div>
         </div>
       )}
