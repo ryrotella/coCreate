@@ -182,8 +182,25 @@ Already configured in the codebase:
 
 Consider adding:
 - Vercel Analytics
-- Edge caching for API routes
 - CDN for static assets (automatic on Vercel)
+
+### API Route Caching
+
+Vercel automatically caches API route responses by default. For routes that serve dynamic data (like `/api/network` which returns all users), caching must be disabled to ensure fresh data:
+
+```typescript
+// Add this export to prevent Vercel from caching the route
+export const dynamic = 'force-dynamic'
+```
+
+**Routes configured for dynamic rendering:**
+- `/api/network` - Returns all users for the network view (must always be fresh)
+
+**Routes that CAN be cached:**
+- Static content routes
+- Routes with infrequent data changes
+
+If new data (users, nodes, etc.) isn't appearing after creation, check that the relevant API route has `export const dynamic = 'force-dynamic'` set.
 
 ---
 

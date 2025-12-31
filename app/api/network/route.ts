@@ -2,6 +2,9 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { NetworkNode, NetworkLink, NetworkGraphData, ConnectionType } from '@/types'
 
+// Force dynamic rendering - prevents Vercel from caching this route
+export const dynamic = 'force-dynamic'
+
 // GET /api/network - Fetch all users as network nodes with connections
 export async function GET() {
   try {
