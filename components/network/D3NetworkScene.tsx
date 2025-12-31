@@ -135,18 +135,28 @@ export default function D3NetworkScene({
     return map
   }, [layers, dimensions])
 
-  // Filter links to only show within current layer (for now)
+  // Only show connections when a node is hovered (reduces visual clutter)
   const visibleLinks = useMemo(() => {
+    // Don't show any connections if nothing is hovered
+    if (!hoveredNodeId) return []
+
     const currentLayerNodeIds = new Set(
       layers.find(l => l.layerIndex === currentLayer)?.nodes.map(n => n.id) || []
     )
 
+    // Only show connections involving the hovered node
     return graphData.links.filter(link => {
       const sourceId = typeof link.source === 'string' ? link.source : link.source.id
       const targetId = typeof link.target === 'string' ? link.target : link.target.id
-      return currentLayerNodeIds.has(sourceId) && currentLayerNodeIds.has(targetId)
+
+      // Must involve the hovered node
+      const involvesHovered = sourceId === hoveredNodeId || targetId === hoveredNodeId
+      // Both nodes must be in current layer
+      const inCurrentLayer = currentLayerNodeIds.has(sourceId) && currentLayerNodeIds.has(targetId)
+
+      return involvesHovered && inCurrentLayer
     })
-  }, [graphData.links, layers, currentLayer])
+  }, [graphData.links, layers, currentLayer, hoveredNodeId])
 
   // Keyboard panning (WASD and Arrow keys)
   useEffect(() => {

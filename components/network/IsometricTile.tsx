@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { NetworkNode } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
@@ -35,6 +35,7 @@ export default function IsometricTile({
   const [hovered, setHovered] = useState(false)
   const [isFollowing, setIsFollowing] = useState(false)
   const [followLoading, setFollowLoading] = useState(false)
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const isOwnTile = user?.id === node.id
 
@@ -104,14 +105,30 @@ export default function IsometricTile({
   }
 
   const handleMouseEnter = () => {
+    // Clear any pending hide timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current)
+      hoverTimeoutRef.current = null
+    }
     setHovered(true)
     onHover(true)
     checkFollowStatus()
   }
 
   const handleMouseLeave = () => {
-    setHovered(false)
-    onHover(false)
+    // Delay hiding to allow mouse to reach orbital buttons
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHovered(false)
+      onHover(false)
+    }, 300)
+  }
+
+  // Cancel hide when mouse enters orbital button area
+  const handleOrbitalAreaEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current)
+      hoverTimeoutRef.current = null
+    }
   }
 
   // Orbital positions (angle in degrees, distance from center)
@@ -306,40 +323,42 @@ export default function IsometricTile({
         </div>
       )}
 
-      {/* Orbital action buttons (particle style) */}
-      <svg
-        className="absolute pointer-events-none"
-        style={{
-          width: tileSize * 2.5,
-          height: tileSize * 2.5,
-          left: -tileSize * 0.75,
-          top: -tileSize * 0.75,
-        }}
-      >
-        {/* Connection lines from center to orbitals */}
-        {orbitals.map((orbital, i) => {
-          const rad = (orbital.angle - 90) * (Math.PI / 180)
-          const endX = tileSize * 1.25 + Math.cos(rad) * orbitRadius
-          const endY = tileSize * 1.25 + Math.sin(rad) * orbitRadius
-          return (
-            <line
-              key={`line-${i}`}
-              x1={tileSize * 1.25}
-              y1={tileSize * 1.25}
-              x2={endX}
-              y2={endY}
-              stroke={colors.glow}
-              strokeWidth="2"
-              strokeDasharray="4 2"
-              opacity="0.6"
-              className="animate-pulse"
-            />
-          )
-        })}
-      </svg>
+      {/* Orbital action buttons (particle style) - only show on hover */}
+      {hovered && (
+        <>
+          <svg
+            className="absolute pointer-events-none"
+            style={{
+              width: tileSize * 2.5,
+              height: tileSize * 2.5,
+              left: -tileSize * 0.75,
+              top: -tileSize * 0.75,
+            }}
+          >
+            {/* Connection lines from center to orbitals */}
+            {orbitals.map((orbital, i) => {
+              const rad = (orbital.angle - 90) * (Math.PI / 180)
+              const endX = tileSize * 1.25 + Math.cos(rad) * orbitRadius
+              const endY = tileSize * 1.25 + Math.sin(rad) * orbitRadius
+              return (
+                <line
+                  key={`line-${i}`}
+                  x1={tileSize * 1.25}
+                  y1={tileSize * 1.25}
+                  x2={endX}
+                  y2={endY}
+                  stroke={colors.glow}
+                  strokeWidth="2"
+                  strokeDasharray="4 2"
+                  opacity="0.6"
+                  className="animate-pulse"
+                />
+              )
+            })}
+          </svg>
 
-      {/* Orbital buttons */}
-      {orbitals.map((orbital, i) => {
+          {/* Orbital buttons */}
+          {orbitals.map((orbital, i) => {
         // Skip follow button if viewing own tile or not logged in
         if (orbital.icon === 'follow' && (isOwnTile || !user)) return null
 
@@ -351,6 +370,8 @@ export default function IsometricTile({
           <button
             key={`orbital-${i}`}
             onClick={orbital.action}
+            onMouseEnter={handleOrbitalAreaEnter}
+            onMouseLeave={handleMouseLeave}
             disabled={orbital.icon === 'follow' && followLoading}
             className="absolute flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110 shadow-lg"
             style={{
@@ -398,6 +419,8 @@ export default function IsometricTile({
           </button>
         )
       })}
+        </>
+      )}
     </div>
   )
 }

@@ -84,18 +84,20 @@ export default function IsometricGrid({
       target: typeof l.target === 'string' ? l.target : l.target.id
     }))
 
-    // Create force simulation
+    // Create force simulation with stronger repulsion for cleaner spacing
     const simulation = d3.forceSimulation<SimulationNode>(simNodes)
-      .force('charge', d3.forceManyBody().strength(-200))
+      .force('charge', d3.forceManyBody().strength(-800))
       .force('center', d3.forceCenter(0, 0))
-      .force('collision', d3.forceCollide().radius(tileSize * 0.8))
+      .force('collision', d3.forceCollide().radius(tileSize * 1.4))
       .force('link', d3.forceLink(simLinks)
         .id((d: d3.SimulationNodeDatum) => (d as SimulationNode).id)
-        .distance(tileSize * 2)
-        .strength(0.3)
+        .distance(tileSize * 3)
+        .strength(0.2)
       )
+      .force('x', d3.forceX(0).strength(0.03))
+      .force('y', d3.forceY(0).strength(0.03))
       .alphaDecay(0.02)
-      .velocityDecay(0.4)
+      .velocityDecay(0.3)
 
     // Update positions on tick
     simulation.on('tick', () => {
